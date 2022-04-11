@@ -10,17 +10,14 @@ import SDL "vendor:sdl2"
 
 Block :: struct {
 	position:      glsl.vec2,
+	color:         glsl.ivec4,
 	width, height: f32,
 }
 
-PlayerState :: struct {
-	position:     glsl.vec2,
-	velocity:     glsl.vec2,
-	acceleration: glsl.vec2,
-}
-
 Player :: struct {
-	using state:   PlayerState,
+	position:      glsl.vec2,
+	velocity:      glsl.vec2,
+	acceleration:  glsl.vec2,
 	width, height: f32,
 }
 
@@ -44,18 +41,24 @@ main :: proc() {
 	defer SDL.DestroyRenderer(renderer)
 
 	blocks: [dynamic]Block
-	append(&blocks, Block{position = {320, 400}, width = 600, height = 20})
-	append(&blocks, Block{position = {450, 365}, width = 60, height = 50})
+	append(
+		&blocks,
+		Block{position = {320, 400}, color = {0, 255, 255, 0}, width = 600, height = 20},
+	)
+	append(
+		&blocks,
+		Block{position = {450, 365}, color = {0, 255, 255, 0}, width = 60, height = 50},
+	)
+	append(
+		&blocks,
+		Block{position = {450, 250}, color = {0, 255, 255, 0}, width = 60, height = 50},
+	)
 
 	player := Player {
-		state = {position = {100, 100}},
+		position = {100, 100},
 		width = 40,
 		height = 100,
 	}
-
-	previous_player_states: [dynamic]PlayerState
-	old_player: ^Block
-	old_player_index: int
 
 	left, right, jump: bool
 
@@ -80,16 +83,19 @@ main :: proc() {
 				if event.key.keysym.sym == .SPACE {
 					jump = event.key.state != 0
 				}
-				if event.key.keysym.sym == .E && event.key.state != 0 && old_player == nil {
-					append(
-						&blocks,
-						Block{
-							position = previous_player_states[0].position,
-							width = player.width,
-							height = player.height,
-						},
-					)
-					old_player = &blocks[len(blocks) - 1]
+				if event.key.keysym.sym == .LSHIFT {
+					if event.key.state != 0 && player.height == 100 {
+						player.height = 50
+						player.position.y += 25
+					} else {
+						player.height = 100
+						player.position.y -= 25
+					}
+				}
+				if event.key.keysym.sym == .R && event.key.state != 0 {
+					player.position = {100, 100}
+					player.velocity = 0
+					player.acceleration = 0
 				}
 			}
 		}
@@ -102,12 +108,6 @@ main :: proc() {
 			defer fixed_time_counter -= FIXED_TIME
 
 			{
-				append(&previous_player_states, player.state)
-				if old_player != nil {
-					old_player.position = previous_player_states[old_player_index].position
-					old_player_index += 1
-				}
-
 				defer {
 					player.velocity += player.acceleration
 					player.position += player.velocity * dt
@@ -156,7 +156,7 @@ main :: proc() {
 
 				if jump {
 					if touching_ground {
-						player.acceleration.y -= 310.0
+						player.acceleration.y -= 310.0 if player.height == 100 else 620.0
 					}
 				}
 			}
@@ -170,8 +170,16 @@ Render :: proc(renderer: ^SDL.Renderer, blocks: []Block, player: Player) {
 	SDL_CheckCode(SDL.SetRenderDrawColor(renderer, 51, 51, 51, 255))
 	SDL_CheckCode(SDL.RenderClear(renderer))
 
-	SDL_CheckCode(SDL.SetRenderDrawColor(renderer, 0, 255, 255, 255))
 	for block in blocks {
+		SDL_CheckCode(
+			SDL.SetRenderDrawColor(
+				renderer,
+				u8(block.color.r),
+				u8(block.color.g),
+				u8(block.color.b),
+				u8(block.color.a),
+			),
+		)
 		SDL_CheckCode(
 			SDL.RenderDrawRectF(
 				renderer,
