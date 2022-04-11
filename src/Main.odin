@@ -13,10 +13,14 @@ Block :: struct {
 	width, height: f32,
 }
 
+PlayerState :: struct {
+	position:     glsl.vec2,
+	velocity:     glsl.vec2,
+	acceleration: glsl.vec2,
+}
+
 Player :: struct {
-	position:      glsl.vec2,
-	velocity:      glsl.vec2,
-	acceleration:  glsl.vec2,
+	using state:   PlayerState,
 	width, height: f32,
 }
 
@@ -44,10 +48,14 @@ main :: proc() {
 	append(&blocks, Block{position = {450, 365}, width = 60, height = 50})
 
 	player := Player {
-		position = {100, 100},
+		state = {position = {100, 100}},
 		width = 40,
 		height = 100,
 	}
+
+	previous_player_states: [dynamic]PlayerState
+	old_player: ^Block
+	old_player_index: int
 
 	left, right, jump: bool
 
@@ -72,6 +80,17 @@ main :: proc() {
 				if event.key.keysym.sym == .SPACE {
 					jump = event.key.state != 0
 				}
+				if event.key.keysym.sym == .E && event.key.state != 0 && old_player == nil {
+					append(
+						&blocks,
+						Block{
+							position = previous_player_states[0].position,
+							width = player.width,
+							height = player.height,
+						},
+					)
+					old_player = &blocks[len(blocks) - 1]
+				}
 			}
 		}
 
@@ -83,6 +102,12 @@ main :: proc() {
 			defer fixed_time_counter -= FIXED_TIME
 
 			{
+				append(&previous_player_states, player.state)
+				if old_player != nil {
+					old_player.position = previous_player_states[old_player_index].position
+					old_player_index += 1
+				}
+
 				defer {
 					player.velocity += player.acceleration
 					player.position += player.velocity * dt
